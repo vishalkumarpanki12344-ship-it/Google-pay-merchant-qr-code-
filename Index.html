@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Merchant UPI QR Generator</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f0f4ff;
+      color: #202124;
+    }
+
+    .container {
+      max-width: 430px;
+      margin: 20px auto;
+      padding: 24px;
+      background: white;
+      border-radius: 18px;
+      box-shadow: 0 5px 25px #00000012;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 25px;
+      color: #1769e0;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 25px;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin-top: 16px;
+      margin-bottom: 7px;
+    }
+
+    input {
+      width: 100%;
+      padding: 13px;
+      border: 1px solid #ccd2df;
+      border-radius: 9px;
+      font-size: 16px;
+    }
+
+    button {
+      width: 100%;
+      border: none;
+      padding: 14px;
+      margin-top: 18px;
+      border-radius: 9px;
+      background: #1769e0;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:active {
+      opacity: 0.8;
+    }
+
+    .secondary {
+      background: #188038;
+    }
+
+    #result {
+      display: none;
+      text-align: center;
+      margin-top: 25px;
+      padding: 16px;
+      border: 1px solid #e0e5ef;
+      border-radius: 12px;
+    }
+
+    #qrcode {
+      display: flex;
+      justify-content: center;
+      margin: 15px 0;
+    }
+
+    #qrcode img,
+    #qrcode canvas {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .notice {
+      font-size: 12px;
+      line-height: 1.6;
+      color: #666;
+      margin-top: 22px;
+    }
+
+    footer {
+      text-align: center;
+      font-size: 12px;
+      color: #777;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <h1>Merchant UPI QR</h1>
+
+    <p class="subtitle">
+      अपना UPI QR Code बनाएँ और डाउनलोड करें
+    </p>
+
+    <form id="qrForm">
+      <label for="merchant">दुकानदार का नाम *</label>
+      <input
+        id="merchant"
+        type="text"
+        placeholder="जैसे: Gupta Store"
+        maxlength="80"
+        required
+      >
+
+      <label for="upi">UPI ID *</label>
+      <input
+        id="upi"
+        type="text"
+        placeholder="example@upi"
+        maxlength="100"
+        required
+      >
+
+      <label for="amount">राशि (₹) — वैकल्पिक</label>
+      <input
+        id="amount"
+        type="number"
+        placeholder="जैसे: 100"
+        min="1"
+        max="1000000"
+        step="0.01"
+      >
+
+      <button type="submit">Generate QR Code</button>
+    </form>
+
+    <section id="result">
+      <h2 id="shopName"></h2>
+      <div id="qrcode"></div>
+      <p id="paymentInfo"></p>
+
+      <button type="button" class="secondary" id="downloadBtn">
+        Download QR Code
+      </button>
+    </section>
+
+    <p class="notice">
+      सावधानी: यह सामान्य UPI QR जनरेटर है, Google Pay का
+      आधिकारिक मर्चेंट ऑनबोर्डिंग सिस्टम नहीं। QR बनाने से
+      भुगतान की पुष्टि नहीं होती। भुगतान प्राप्त होने की
+      पुष्टि अपने UPI ऐप या बैंक में करें।
+    </p>
+
+    <footer>
+      UPI QR Generator
+    </footer>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <script>
+    const form = document.getElementById("qrForm");
+    const result = document.getElementById("result");
+    const qrBox = document.getElementById("qrcode");
+    const downloadBtn = document.getElementById("downloadBtn");
+
+    let currentCanvas = null;
+    let currentImage = null;
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      const merchant = document
+        .getElementById("merchant").value.trim();
+
+      const upi = document
+        .getElementById("upi").value.trim();
+
+      const amountInput = document
+        .getElementById("amount").value.trim();
+
+      if (!merchant || !upi) {
+        alert("दुकानदार का नाम और UPI ID भरें।");
+        return;
+      }
+
+      if (!/^[^@\s]+@[^@\s]+$/.test(upi)) {
+        alert("कृपया सही प्रारूप में UPI ID भरें।");
+        return;
+      }
+
+      let amount = "";
+
+      if (amountInput) {
+        const parsedAmount = Number(amountInput);
+
+        if (!Number.isFinite(parsedAmount) ||
+            parsedAmount <= 0 ||
+            parsedAmount > 1000000) {
+          alert("कृपया सही राशि भरें।");
+          return;
+        }
+
+        amount = parsedAmount.toFixed(2);
+      }
+
+      const params = new URLSearchParams({
+        pa: upi,
+        pn: merchant,
+        cu: "INR"
+      });
+
+      if (amount) {
+        params.set("am", amount);
+      }
+
+      const paymentURI = "upi://pay?" + params.toString();
+
+      qrBox.innerHTML = "";
+      currentCanvas = null;
+      currentImage = null;
+
+      document.getElementById("shopName").textContent = merchant;
+
+      document.getElementById("paymentInfo").textContent =
+        amount
+          ? "भुगतान राशि: ₹" + amount
+          : "भुगतान राशि: ग्राहक स्वयं दर्ज कर सकता है";
+
+      new QRCode(qrBox, {
+        text: paymentURI,
+        width: 240,
+        height: 240,
+        correctLevel: QRCode.CorrectLevel.H
+      });
+
+      result.style.display = "block";
+
+      setTimeout(function () {
+        currentCanvas = qrBox.querySelector("canvas");
+        currentImage = qrBox.querySelector("img");
+      }, 100);
+
+      result.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+    });
+
+    downloadBtn.addEventListener("click", function () {
+      let imageData = "";
+
+      if (currentCanvas) {
+        imageData = currentCanvas.toDataURL("image/png");
+      } else if (currentImage && currentImage.src) {
+        imageData = currentImage.src;
+      }
+
+      if (!imageData) {
+        alert("पहले QR Code बनाएँ।");
+        return;
+      }
+
+      const link = document.createElement("a");
+      link.href = imageData;
+      link.download = "merchant-upi-qr.png";
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    });
+  </script>
+</body>
+</html>
